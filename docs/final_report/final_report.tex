@@ -53,7 +53,20 @@
   \section*{Introduction}
     In this project we implemented a fast Fourier transform algorithm on a Xilinx FPGA using VHDL. The primary motivation of our project was to digitally analyze musical signals, but the use cases for an FFT chip far surpass that specific use case. \\
     
-    As a very general overview, our completed device functions by sampling an analog signal for a set amount of time and storing the data into an input buffer in BRAM. Next, the signal is is processed using an FT controller and a complex ALU and stored in an output buffer. Finally, a microcontroller can then read the output buffer over a standard SPI protocol. From there the processed frequency domain data can be sent to a computer for further processing or any other device.
+    As a very general overview, our completed device functions by sampling an analog signal for a set amount of time and storing the data into an input buffer in BRAM. Next, the signal is is processed using an Fourier Transform Controller and stored in an output buffer. Finally, a microcontroller can then read the output buffer over a standard SPI protocol. From there the processed frequency domain data can be sent to a computer for further processing or any other device.
+
+  \section*{Motivation}
+    The FFT is a very common operation used in many digital signal processing tasks.
+    Digital signal processors are usually very highly tuned to perform a series of dedicated tasks quickly, and have very little flexability in the way of general purpose usage.
+    This is both a blessing and a curse, as they rarely need to be reprogrammed, but are also limited to the range of tasks they can accomplish.
+    High end DSPs utilize parallelism to complete mathematical calculations quickly.
+    Because of their dedicated nature, DSPs also tend to be rather costly, upwards of \$32 for a SHARC model chip from Analog Electronics.\\
+
+    FPGAs are primarily a large collection of configurable logic blocks that can be wired together to run in parallel, so why not try and use one in place of an expensive DSP?
+    By taking the heavy computations off of a typical CPU and putting the burden onto an FPGA, the processor could be freed up to execute any number of instructions until the heavy computations are complete.
+    This hybrid model has actually become quite popular in the past several years, and several products such as some of Intel's Xeon chips have FPGAs integrated onboard.
+    This can offset the costs for companies who formerly may have been inclined to build expensive ASICs and instead shift their focus onto a new platform.
+    A parallel CPU/FPGA integrated system is beyond the scope of this project, but instead a simple model using a Digilent Basys board and an Arduino are built to illustrate the principles.
 
   \section*{Theory}
     To understand the discrete Fourier transform, one must first analyze its analogous continuous    time form.
@@ -71,10 +84,10 @@
     \end{align*}
     As with the continuous time case, this series gives us a glimpse into the component elements of  our original signal.
     However, it is rather costly to compute, requiring a time complexity of $O(N^2)$.
-    For each value $X_k$, a series of values from $n = 0$ to $N - 1$ must be generated and summed,   using up valuable computer resources.
+    For each value $X_k$, a series of values from $n = 0$ to $N - 1$ must be generated and summed,   using up valuable hardware resources.
     Thus, calculating the DFT in this way is very inefficient, so we instead turn to the Fast  Fourier transform.\\
 
-    In order to perform this operation more quickly, we utilized the Cooley-Tukey FFT algorithm implemented through the Xilinx CoreGen FFT module.
+    In order to perform this operation more quickly, we utilized the Cooley-Tukey FFT algorithm implemented through the Xilinx CORE Generator FFT module.
     One requirement is that our input is strictly a power of 2.
     That is because the algorithm works by recursively finding the FFT of smaller and smaller sample sizes of $x_n$, which arises from the fact that the transform itself is periodic.
     The transform function can be broken into the sum of its even and odd components,
@@ -97,21 +110,8 @@
         &O_k = O_{k+\frac{N}{2}}
     \end{align*}
   
-  \section*{Motivation}
-    The FFT is a very common operation used in many digital signal processing tasks.
-    Digital signal processors are usually very highly tuned to perform a series of dedicated tasks quickly, and have very little flexability in the way of general purpose usage.
-    This is both a blessing and a curse, as they rarely need to be reprogrammed, but are also limited to the range of tasks they can accomplish.
-    High end DSPs utilize parallelism to complete mathematical calculations quickly.
-    Because of their dedicated nature, DSPs also tend to be rather costly, upwards of \$32 for a SHARC model chip from Analog Electronics.\\
-
-    FPGAs are primarily a large collection of configurable logic blocks that can be wired together to run in parallel, so why not try and use one in place of an expensive DSP?
-    By taking the heavy computations off of a typical CPU and putting the burden onto an FPGA, the processor could be freed up to execute any number of instructions until the heavy computations are complete.
-    This hybrid model has actually become quite popular in the past several years, and several products such as some of Intel's Xeon chips have FPGAs integrated onboard.
-    This can offset the costs for companies who formerly may have been inclined to build expensive ASICs and instead shift their focus onto a new platform.
-    A parallel CPU/FPGA integrated system is beyond the scope of this project, but instead a simple model using a Digilent Basys board and an Arduino are built to illustrate the principles.
-
   \section*{System Overview}
-    A critical task in building our FFT device was converting an arbitrary waveform into the SPI signal input that the FPGA expected. This requires the use of a fast analog to digital converter. The Xilinx Spartan 3E FPGA does not come with an onboard ADC. Because of this, a large percentage of the work was performed by electronics external to the FPGA:
+    A critical task in building our FFT device was converting an arbitrary waveform into the SPI signal input that the FPGA expected. This requires the use of a fast analog to digital converter. The Xilinx Spartan-3E FPGA does not come with an onboard ADC. Because of this, a large percentage of the work was performed by electronics external to the FPGA:
 
     \begin{figure}[H]
       \centering
@@ -155,11 +155,12 @@
     \subsection*{Computer software}
       The computer software for this project is divided into two components. The first component is the Python module that facilitates the reading and decoding of the data from the serial port. It will read out 512 complex numbers and, optionally, compute the magnitude of each of those numbers. The second component is the actual display. It will use the Python module to read the device and it uses Tkinter to display the plot on the screen.
 
+    \clearpage
   \section*{Micro-Component Descriptions}
     The final block diagram of our device is as follows:
     \begin{figure}[H]
       \centering
-      \includegraphics[trim=0 400 0 400,clip,width=140mm]{vhdl_fft.pdf}
+      \includegraphics[scale=0.375]{block_diagram}
       \caption{Block diagram of the system and subcomponents}
       \label{overflow}
     \end{figure}
@@ -171,8 +172,7 @@
       \item SPI Master: An OpenCore that implements an SPI master interface. This handles the control and reading of the SPI bus from either the deterministic ADC or the external ADC.
       \item Capture Controller: This block reads samples from the SPI Master and stores the readings as complex numbers in the input buffer. The sample size is 512. It also communicates with the FT controller about when it finishes.
       \item FT controller: This block cooridinates access to the BRAM between the Capture Controller, FFT Block and OUTBUF interpreter using a simple state machine.
-      \item FFT Block: Performs the FFT when given the start signal from the FT controller.
-      %\item Complex ALU: This block handles complex multiplications for the FT controller.
+      \item FFT Block: Performs the FFT when given the start signal from the FT controller. This was instantiated from the Xilinx IPCore Generator library and requires 2 block RAMs and 3 Multipliers, which the Spartan-3E was barely able to accomidate.
       \item OUTBUF interpreter: This block facilitates the reading of the OUTBUF by feeding words into the SPI slave module.
       \item SPI Slave: An OpenCore that implements an SPI slave interface. This handles the control and writing of the SPI bus, and it connects to an external microcontroller.
     \end{itemize}
@@ -187,22 +187,22 @@
       \item fft\_write: The FFT Block writes data to the output buffer.
       \item oi\_read: The OUTBUF Interpreter reads from the output buffer and sends the data out into the arduino.
     \end{enumerate}
-    These steps are then repeated as long as the system is enabled.
+    These steps are then repeated as long as the system is enabled.\\
     
-    \begin{figure}[h]
+    \begin{figure}[h!]
       \centering
       \includegraphics[scale=0.4]{small_sim}
       \caption{Close up of the transition between fft read and write stages}
     \end{figure}
     
     Figure 6 shows the wait\_for\_valid state, which only lasts for several clock cycles.
-    It is an indication from the FFT Block that the transform has finished computing and it will be writing data to its output as soon as a valid signal is given.
+    It is an indication from the FFT block that the transform has finished computing and it will be writing data to its output as soon as a valid signal is given.
     Once valid goes high, the data is written out on the xk\_re and xk\_im lines.
     Note that in this simulation, the input was a sawtooth wave, which is an odd signal.
     Thus, ideally all the real parts of the signal would be 0.
     This is not exactly the case, but it is reasonable, as the real outputs are \textit{mostly} zeros.
     
-    \begin{figure}[h]
+    \begin{figure}[h!]
       \centering
       \includegraphics[width=140mm,height=10mm]{cycle}
       \caption{Simulation of the entire processing cycle}
@@ -210,20 +210,76 @@
       
     The important thing to note in the above figure is the relative lengths of each stage.
     The actual FFT computation is performed in the very middle of the simulation, and is always approximately 55 us.
-    This is never really a problem for us, as the capture controller receives 512 samples over the course of about 6.4 ms, which leaves plenty of time in between cycles to compute the FFT and write the data out to the Arduino.
-    
-    %He seemed really excited about timing results so we should probably discuss this here.
+    In practice, the capture controller receives 512 samples over the course of about 6.4 ms, which leaves plenty of time in between cycles to compute the FFT and write the data out to the Arduino.
+    It is smaller here because the cycle would take a very long time to simulate using the real-time capture speed.\\
 
-  \section*{Roadblocks}
+    Several videos have been uploaded to youtube demonstrating the current capabilities of the system.
+    They are included in the appendix section and can be accessed from the project repository on github as well.
+    Also source code can also be found on github.
+    %BE SURE TO COME BACK AND ADD THE LINKS TO THE VIDEOS TO THE appendix AND REPO!!! 
     
+  \section*{Roadblocks}
+    At the start of this project, we planned on computing the DFT entirely out of custom components.
+    However, as the project wore on, we realized that this model was impractical and couldn't be accomplished in the time alotted by two undergraduates with relatively little signal processing and VHDL experience.
+    Thus, we turned to the Xilinx CORE Generator, which luckily enough had an FFT module available for the Spartan-3E.
+    It utilizes the Cooley-Tukey algorithm as described above, but in a much more professional manner.
+    It also preloads the board with any needed twiddle factors, which was one of the biggest concerns regarding the custom module.
+    In order to change anything about your sample or word sizes, much more code would have to be rewritten, whereas by using the CoreGen model, we can just rebuild the core.
+    This allows for much more flexability in our design, which is very important for a project with so many variables.\\
+
+    Because all of the microcomponents needed to fit on a single Spartan-3E FPGA, some serious size considerations had to be taken into account.
+    First and foremost, there is a very limited pool of resources available on the board.
+    The Spartan-3E only has four BRAMs and four MULTs available.
+    At first we planned on using the Radix-2, Burst I/O implementation of the FFT block, which only used three of each of the MULTs and BRAMs.
+    This synthesized and simulated well, however the tool refused to route the design.
+    This was because of conflicting resources between the BRAMs and MULTs, as they share several internal busses that couldn't be switched fast enough.\\
+    
+    In order to remedy the design, the core has another option of Radix-2 Lite, Burst I/O.
+    This uses one less BRAM, but takes about 20 us longer to perform the computation.
+    As mentioned before, this was not a real concern, as we were taking samples as such large intervals that forcing a calculation to last 55 us instead of 35 us was not that big of a deal.\\
 
   \section*{Future Improvements}
+    The largest detractor from our system's functionality is the lack of storage space on the FPGA.
+    Because all of our data needed to be stored as complex numbers, each word was split into a real and complex part, each with a bit width of 8, represented as fixed point 2's complement.
+    In order to store the desired 512 samples, we needed at least 8k RAM, which is close to half of a single BRAM.
+    The other half could then be used to store the processed data to be read by the output interpreter.
+    An 8 bit word does not provide good resolution at all, but increasing it would be unroutable, as another BRAM would need to be instantiated bringing our total up to four.\\
+
+    If we had more time, there are some improvements that could be made.
+    One is by doubling the word size to 32 and halving the sample size, which wouldn't affect the BRAM configuration at all.
+    This would get rid of many of the uppermost frequencies, but would allow for more accuracy when analyzing the data.
+    Another observation is that the input buffer and output buffer are never accessed at the same time.
+    Thus, they could essentially be merged into a single block without any consequence.
+    The input data would just be overwritten by the output data, which wouldn't be replaced until the capture controller is started up again.\\
+
+    This could allow for the increase from 32 bit to 64 bit words, which is actually large enough to start using IEEE 754 standard floating point arithmetic.
+    Ideally this option would have been implemented. 
+    It allows for the most accurate results at the expense of latency, which as we've explained isn't really an issue for this project.
+    Most high end DSPs use floating point calculations as opposed to fixed point, which is much more appropriate considering the amount of mathematical calculations performed.\\
+
+    To combat the growth issues of fixed point multiplication, the FFT block requires a scaling factor field that is proportional to the sample size.
+    After some experimentation, we settled on an adjustment of $[2 1 3 0]$, which represents the number of bits by which to shift the output data at each even stage of the transform.
+    This is not an ideal solution, as bit shifting already small numbers may just end up ruining what little valid data is present.
+    However, that is one of the compromises of using such a small word size.\\ 
 
   \section*{Conclusion}
+    In the end, our system was successful, although not nearly as high quality as we were hoping.
+    With more experience, expertise and time however, some great improvements could be made.
+    By implementing a floating point unit and increasing the resolution size, the processed data would be much more accurate.
+    As a whole, this system design was a fight against too few resources. 
+    The Spartan-3E FPGA was not designed to be a rigourous calculating machine; instead it is a simple introduction to the capabilities of FPGAs in general.
+    This is not a bad thing, but its natural limitations start to become an issue when it's being used to fill a need it simply wasn't designed for.
 
   \clearpage
   \section*{Appendix}
+    \begin{enumerate}
+        \item \textbf{Github Repo:} \textless\url{https://github.com/gmassman/vhdl_fft.git}\textgreater
+        \item \textbf{Signal Generator Video:} \textless\url{https://www.youtube.com/watch?v=2sd1Fj6ndW4}\textgreater
+        \item \textbf{Audio Signal Video:} \textless\url{https://www.youtube.com/watch?v=x32IYwRD3P8}\textgreater
+        \item \textbf{Full System Video:} \textless\url{https://www.youtube.com/watch?v=RKyCnKK4a5A}\textgreater
+    \end{enumerate}
 
+  \clearpage
   \begin{thebibliography}{9}
     \bibitem{doin}
       Doin, Jonny. \emph{SPI Master/Slave Interface.} OpenCores, 16 May 2011. Web. 13 Sept. 2014. \textless\url{http://opencores.org/project,spi_master_slave}\textgreater.
@@ -237,6 +293,8 @@
       Wikipedia contributors. \emph{Cooley–Tukey FFT algorithm.} Wikipedia, The Free Encyclopedia. Wikipedia, The Free Encyclopedia, 27 Jun. 2014. Web. 13 Sep. 2014.
     \bibitem{dft}
       Wikipedia contributors. \emph{Discrete Fourier transform.} Wikipedia, The Free Encyclopedia. Wikipedia, The Free Encyclopedia, 2 Sep. 2014. Web. 13 Sep. 2014.
+    \bibitem{xilinx}
+      Xilinx. \emph{LogiCORE IP Fast Fourier Transform v7.1} Product Specifications, 1 March 2011. 
   \end{thebibliography}
 
 \end{document}
