@@ -111,7 +111,7 @@
     A parallel CPU/FPGA integrated system is beyond the scope of this project, but instead a simple model using a Digilent Basys board and an Arduino are built to illustrate the principles.
 
   \section*{System Overview}
-    A critical task in building our FFT device was converting an arbitrary waveform into the SPI signal input that the FPGA expected. This requires the use of a fast analog to digital converter. The Xilinx Spartan 3E FPGA does not come with an onboard ADC. Because of this, a large percentage of the work was actually electronics work done outside of the FPGA:
+    A critical task in building our FFT device was converting an arbitrary waveform into the SPI signal input that the FPGA expected. This requires the use of a fast analog to digital converter. The Xilinx Spartan 3E FPGA does not come with an onboard ADC. Because of this, a large percentage of the work was performed by electronics external to the FPGA:
 
     \begin{figure}[H]
       \centering
@@ -160,28 +160,62 @@
     \begin{figure}[H]
       \centering
       \includegraphics[trim=0 400 0 400,clip,width=140mm]{vhdl_fft.pdf}
-      \caption{Block diagram of the FFT chip}
+      \caption{Block diagram of the system and subcomponents}
       \label{overflow}
     \end{figure}
     All of the blocks inside the FPGA device are referred to as micro-components.
 
     \begin{itemize}
-      \item Deterministic ADC: Provides a completely predictable ADC signal to test with and substituted for a real ADC while it was shipping.
+      \item Deterministic ADC: Provides a completely predictable ADC signal for testing; it substituted for a real ADC until one was acquired.
       \item SPI Mux: A simple multiplexer that selects between the external ADC and the deterministic ADC.
       \item SPI Master: An OpenCore that implements an SPI master interface. This handles the control and reading of the SPI bus from either the deterministic ADC or the external ADC.
       \item Capture Controller: This block reads samples from the SPI Master and stores the readings as complex numbers in the input buffer. The sample size is 512. It also communicates with the FT controller about when it finishes.
-      \item FT controller: This block actually executes the fast Fourier transfer algorithm whenever the capture controller indicates that the input buffer is valid.
-      \item Complex ALU: This block handles complex multiplications for the FT controller.
+      \item FT controller: This block cooridinates access to the BRAM between the Capture Controller, FFT Block and OUTBUF interpreter using a simple state machine.
+      \item FFT Block: Performs the FFT when given the start signal from the FT controller.
+      %\item Complex ALU: This block handles complex multiplications for the FT controller.
       \item OUTBUF interpreter: This block facilitates the reading of the OUTBUF by feeding words into the SPI slave module.
       \item SPI Slave: An OpenCore that implements an SPI slave interface. This handles the control and writing of the SPI bus, and it connects to an external microcontroller.
     \end{itemize}
 
   \section*{Simulation Results}
-
-  \section*{Results}
-    He seemed really excited about timing results so we should probably discuss this here.
+    After the subcomponents of the system were verified individually, they were all assembled together under the FT Controller block, which acted as our top module.
+    The most important shared resource in our design was a single 18k BRAM instantiated inside the FT Controller.
+    The RAM was split into two halves, the first acting as an input buffer and the second acting as an output buffer, and was controlled using four main states: 
+    \begin{enumerate}
+      \item cc\_write: The Capture Controller has access to the RAM and writes its data directly to the input buffer.
+      \item fft\_read: The FFT Block reads data from the input buffer.  It remains in this state until the FFT calculation is actually performed.
+      \item fft\_write: The FFT Block writes data to the output buffer.
+      \item oi\_read: The OUTBUF Interpreter reads from the output buffer and sends the data out into the arduino.
+    \end{enumerate}
+    These steps are then repeated as long as the system is enabled.
+    
+    \begin{figure}[h]
+      \centering
+      \includegraphics[scale=0.4]{small_sim}
+      \caption{Close up of the transition between fft read and write stages}
+    \end{figure}
+    
+    Figure 6 shows the wait\_for\_valid state, which only lasts for several clock cycles.
+    It is an indication from the FFT Block that the transform has finished computing and it will be writing data to its output as soon as a valid signal is given.
+    Once valid goes high, the data is written out on the xk\_re and xk\_im lines.
+    Note that in this simulation, the input was a sawtooth wave, which is an odd signal.
+    Thus, ideally all the real parts of the signal would be 0.
+    This is not exactly the case, but it is reasonable, as the real outputs are \textit{mostly} zeros.
+    
+    \begin{figure}[h]
+      \centering
+      \includegraphics[width=140mm,height=10mm]{cycle}
+      \caption{Simulation of the entire processing cycle}
+    \end{figure}
+      
+    The important thing to note in the above figure is the relative lengths of each stage.
+    The actual FFT computation is performed in the very middle of the simulation, and is always approximately 55 us.
+    This is never really a problem for us, as the capture controller receives 512 samples over the course of about 6.4 ms, which leaves plenty of time in between cycles to compute the FFT and write the data out to the Arduino.
+    
+    %He seemed really excited about timing results so we should probably discuss this here.
 
   \section*{Roadblocks}
+    
 
   \section*{Future Improvements}
 
