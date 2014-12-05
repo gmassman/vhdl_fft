@@ -53,11 +53,11 @@
   \section*{Introduction}
     In this project we implemented a fast Fourier transform algorithm on a Xilinx FPGA using VHDL. The primary motivation of our project was to digitally analyze musical signals, but the use cases for an FFT chip far surpass that specific use case. \\
     
-    As a very general overview, our completed device functions by sampling an analog signal for a set amount of time and storing the data into an input buffer in BRAM. Next, the signal is is processed using an Fourier Transform Controller and stored in an output buffer. Finally, a microcontroller can then read the output buffer over a standard SPI protocol. From there the processed frequency domain data can be sent to a computer for further processing or any other device.
+    As a very general overview, our completed device functions by sampling an analog signal for a set amount of time and storing the data into an input buffer in BRAM. Next, the signal is processed using an Fourier Transform Controller and stored in an output buffer. Finally, a microcontroller can then read the output buffer over a standard SPI protocol. From there the processed frequency domain data can be sent to a computer for further processing or any other device.
 
   \section*{Motivation}
     The FFT is a very common operation used in many digital signal processing tasks.
-    Digital signal processors are usually very highly tuned to perform a series of dedicated tasks quickly, and have very little flexability in the way of general purpose usage.
+    Digital signal processors are usually very highly tuned to perform a series of dedicated tasks quickly, and have very little flexibility in the way of general purpose usage.
     This is both a blessing and a curse, as they rarely need to be reprogrammed, but are also limited to the range of tasks they can accomplish.
     High end DSPs utilize parallelism to complete mathematical calculations quickly.
     Because of their dedicated nature, DSPs also tend to be rather costly, upwards of \$32 for a SHARC model chip from Analog Electronics.\\
@@ -74,7 +74,7 @@
     \begin{align*}
     &X(j\omega) = \int_{-\infty}^{\infty} x(t) e^{-j \omega t}\,dt
     \end{align*}
-    which defines the transform of a continuous time signal $f(t)$.
+    which defines the transform of a continuous time signal $x(t)$.
     Without getting into too many details, it defines the signal as a combination of sinusoids,      making it a very useful tool for real world applications.\\
 
     The discrete Fourier transform (DFT) is simply a reduction of the continuous Fourier transform   into a discrete sample space.
@@ -171,7 +171,7 @@
       \item SPI Mux: A simple multiplexer that selects between the external ADC and the deterministic ADC.
       \item SPI Master: An OpenCore that implements an SPI master interface. This handles the control and reading of the SPI bus from either the deterministic ADC or the external ADC.
       \item Capture Controller: This block reads samples from the SPI Master and stores the readings as complex numbers in the input buffer. The sample size is 512. It also communicates with the FT controller about when it finishes.
-      \item FT controller: This block cooridinates access to the BRAM between the Capture Controller, FFT Block and OUTBUF interpreter using a simple state machine.
+      \item FT controller: This block coordinates access to the BRAM between the Capture Controller, FFT Block and OUTBUF interpreter using a simple state machine.
       \item FFT Block: Performs the FFT when given the start signal from the FT controller. This was instantiated from the Xilinx IPCore Generator library and requires 2 block RAMs and 3 Multipliers, which the Spartan-3E was barely able to accomidate.
       \item OUTBUF interpreter: This block facilitates the reading of the OUTBUF by feeding words into the SPI slave module.
       \item SPI Slave: An OpenCore that implements an SPI slave interface. This handles the control and writing of the SPI bus, and it connects to an external microcontroller.
@@ -232,7 +232,7 @@
     The Spartan-3E only has four BRAMs and four MULTs available.
     At first we planned on using the Radix-2, Burst I/O implementation of the FFT block, which only used three of each of the MULTs and BRAMs.
     This synthesized and simulated well, however the tool refused to route the design.
-    This was because of conflicting resources between the BRAMs and MULTs, as they share several internal busses that couldn't be switched fast enough.\\
+    This was because of conflicting resources between the BRAMs and MULTs, as they share several internal buses that couldn't be switched fast enough.\\
     
     In order to remedy the design, the core has another option of Radix-2 Lite, Burst I/O.
     This uses one less BRAM, but takes about 20 us longer to perform the computation.
@@ -267,7 +267,7 @@
     With more experience, expertise and time however, some great improvements could be made.
     By implementing a floating point unit and increasing the resolution size, the processed data would be much more accurate.
     As a whole, this system design was a fight against too few resources. 
-    The Spartan-3E FPGA was not designed to be a rigourous calculating machine; instead it is a simple introduction to the capabilities of FPGAs in general.
+    The Spartan-3E FPGA was not designed to be a rigorous calculating machine; instead it is a simple introduction to the capabilities of FPGAs in general.
     This is not a bad thing, but its natural limitations start to become an issue when it's being used to fill a need it simply wasn't designed for.
 
   \clearpage
